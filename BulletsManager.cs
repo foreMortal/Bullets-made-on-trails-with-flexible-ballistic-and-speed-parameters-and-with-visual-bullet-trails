@@ -3,7 +3,6 @@ using UnityEngine;
 
 public class BulletsManager : MonoBehaviour
 {
-    //public GameObject tyt;
     [SerializeField] private GetStatisticScriptableObject stats;
     [SerializeField] private GameObject bulletPrefab;
 
@@ -24,15 +23,17 @@ public class BulletsManager : MonoBehaviour
     {
         weapon = GetComponent<SetupWeapon>();
 
+        //layers that bullets should pass through
         mask -= 1 << 10;
         mask -= 1 << 11;
         mask -= 1 << 12;
         mask -= 1 << 13;
     }
 
-
-    public void CreateABullet(BulletInfo bullet, HitInfo hitInfo)
+    //Method that should be called from your weapon script
+    public void CreateABullet(BulletInfo bullet, HitInfo hitInfo)//HitInfo is a simple class with damage info. You can change it any way you need
     {
+        //I using two guns system and separate them by string names. could be any indetifier
         if (bullet.GunName == first)
         {
             FireNewBullet(hiddenBulletsFirst, activeBullets, bullet, hitInfo);
@@ -49,6 +50,7 @@ public class BulletsManager : MonoBehaviour
         {
             for (int i = 0; i < activeBullets.Count; i++)
             {
+                //calculate bullets that live too long 
                 if (activeBullets[i].BulletLifeTime > activeBullets[i].BulletLifeLimit)
                 {
                     removeList.Add(activeBullets[i]);
@@ -56,47 +58,35 @@ public class BulletsManager : MonoBehaviour
                 else
                 {
                     activeBullets[i].BulletLifeTime += Time.deltaTime;
+                    //find position bullet would be in this frame if it was flying for real.                                     //here you can add ballistic 
                     Vector3 t = activeBullets[i].FiringDirection + activeBullets[i].CameraStartPosition + activeBullets[i].FiringDirection * activeBullets[i].BulletSpeed * activeBullets[i].BulletLifeTime;
+                    //Moving the object with trail system to make visual trails.
                     activeBullets[i].bulletInstance.transform.position = Vector3.MoveTowards(activeBullets[i].bulletInstance.transform.position, t, activeBullets[i].BulletSpeed * Time.deltaTime);
-
+                    //updating the pos
                     activeBullets[i].LastPosition = activeBullets[i].CurrentPosition;
                     activeBullets[i].CurrentPosition = t;
 
+                    //calcualting vector that bullet would follow in this frame
                     vec = activeBullets[i].CurrentPosition - activeBullets[i].LastPosition;
-
+                    //calculating bullet collision
                     if (Physics.Raycast(activeBullets[i].LastPosition, vec.normalized, out RaycastHit hit, activeBullets[i].BulletSpeed * Time.deltaTime, mask))
                     {
                         if (hit.collider.CompareTag("CanGetHitted"))
                         {
-                            stats.Hits++;
-                            IHitable dummy = hit.collider.GetComponent<IHitable>();
-                            if (dummy != null)
-                            {
-                                dummy.GetHited(activeBullets[i].HitInfo, out bool headShot);
-                                if (headShot)
-                                {
-                                    stats.headShots++;
-                                    weapon.RegisterHit();
-                                }
-                                else
-                                {
-                                    stats.bodyShots++;
-                                    weapon.RegisterHit();
-                                }
-                            }
+                            //enemy hited
                         }
                         else
                         {
-                            stats.Misses++;
+                            //shot missed
                         }
+                        //remove bullet from acive list
                         activeBullets[i].bulletInstance.transform.position = hit.point;
                         removeList.Add(activeBullets[i]);
-                        //bulls.Add(Instantiate(tyt, hit.point, Quaternion.identity));
                     }
                 }
             }
         }
-
+        //this list and buffer list is needed to pool bullet trails and avoid visual problem with trails
         if(removeList.Count > 0)
         {
             foreach (var i in removeList)
@@ -151,16 +141,17 @@ public class BulletsManager : MonoBehaviour
 
     private void FireNewBullet(List<BulletInfo> hiddenBullets, List<BulletInfo> activeBullets, BulletInfo bullet, HitInfo hitInfo)
     {
+        //take the bullet from pool
         if (hiddenBullets.Count > 0)
         {
             hiddenBullets[0].bulletInstance.transform.position = bullet.StartPosition;
             hiddenBullets[0].CopyFrom(bullet);
             hiddenBullets[0].HitInfo = hitInfo;
-            //hiddenBullets[0].script.SetupBullet(this, bullet, hitInfo);
             activeBullets.Add(hiddenBullets[0]);
             hiddenBullets[0].bulletInstance.SetActive(true);
             hiddenBullets.RemoveAt(0);
         }
+        //or create another one
         else
         {
             BulletInfo newBullet = new();
@@ -171,6 +162,7 @@ public class BulletsManager : MonoBehaviour
         }
     }
 
+    //gun switch system
     public void ChangeGun(params string[] gunsNames)
     {
         if (gunsNames[1] == null)
@@ -248,19 +240,6 @@ public class BulletInfo
         BulletLifeTime = 0f;
         BulletLifeLimit = info.BulletLifeLimit;
         BulletSpeed = info.BulletSpeed;
-    }
-
-    public BulletInfo(string GunName, Vector3 StartPosition, Vector3 CameraStartPosition, Quaternion CameraStartRotation, Vector3 FiringDirection, float BulletLifeLimit, float BulletSpeed)
-    {
-        CurrentPosition = CameraStartPosition;
-        HideIterations = 0;
-        this.GunName = GunName;
-        this.StartPosition = StartPosition;
-        this.CameraStartPosition = CameraStartPosition;
-        this.CameraStartRotation = CameraStartRotation;
-        this.FiringDirection = FiringDirection;
-        this.BulletLifeLimit = BulletLifeLimit;
-        this.BulletSpeed = BulletSpeed;
     }
 
     public void CreateNewBullet(string GunName, Vector3 StartPosition, Vector3 CameraStartPosition, Quaternion CameraStartRotation, Vector3 FiringDirection, float BulletLifeLimit, float BulletSpeed, float id)
