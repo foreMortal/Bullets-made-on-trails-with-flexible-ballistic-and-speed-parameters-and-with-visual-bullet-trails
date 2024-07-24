@@ -4,6 +4,7 @@ using UnityEngine;
 public class BulletsManager : MonoBehaviour
 {
     [SerializeField] private GetStatisticScriptableObject stats;
+    //empty object with trail system on it
     [SerializeField] private GameObject bulletPrefab;
 
     private Vector3 vec;
